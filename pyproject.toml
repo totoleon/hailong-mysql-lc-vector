@@ -1,6 +1,6 @@
 [project]
 name = "langchain-google-cloud-sql-mysql"
-version = "0.0.1"
+version = "0.1.0"
 description = "LangChain integrations for Google Cloud SQL for MySQL"
 readme = "README.md"
 license = {file = "LICENSE"}
