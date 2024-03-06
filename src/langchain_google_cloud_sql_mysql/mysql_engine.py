@@ -15,13 +15,14 @@
 # TODO: Remove below import when minimum supported Python version is 3.10
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, List
 
 import google.auth
 import google.auth.transport.requests
 import requests
 import sqlalchemy
 from google.cloud.sql.connector import Connector
+from sqlalchemy import Column, text
 
 if TYPE_CHECKING:
     import google.auth.credentials
@@ -201,3 +202,53 @@ class MySQLEngine:
                 out from the connection pool.
         """
         return self.engine.connect()
+
+    def init_vectorstore_table(
+        self,
+        table_name: str,
+        vector_size: int,
+        content_column: str = "content",
+        embedding_column: str = "embedding",
+        metadata_columns: List[Column] = [],
+        id_column: str = "langchain_id",
+        overwrite_existing: bool = False,
+        store_metadata: bool = True,
+    ) -> None:
+        # await self._aexecute_update("CREATE EXTENSION IF NOT EXISTS vector")
+        # with self.engine.connect() as conn:
+        #     conn.execute(sqlalchemy.text())
+        # Register the vector type
+        # await register_vector(conn)
+
+        if overwrite_existing:
+            # await self._aexecute_update(f"DROP TABLE {table_name}")
+            with self.engine.connect() as conn:
+                conn.execute(text(f"DROP TABLE {table_name}"))
+                conn.commit()
+
+        # Currently it's varbinary({vector_size})
+        # For preview it will be gvector({vector_size})
+        # query = f"""CREATE TABLE IF NOT EXISTS {table_name}(
+        #     {id_column} CHAR(36) PRIMARY KEY,
+        #     {content_column} TEXT NOT NULL
+        #     {embedding_column} varbinary({vector_size * 4}) NOT NULL"""
+
+        query = f"""CREATE TABLE IF NOT EXISTS {table_name} (
+            {id_column} CHAR(36) PRIMARY KEY,
+            {content_column} TEXT NOT NULL,
+            {embedding_column} VARBINARY({vector_size * 4}) NOT NULL"""
+
+
+        for column in metadata_columns:
+            query += f",\n{column.name} {column.type}" + (
+                "NOT NULL" if not column.nullable else ""
+            )
+        if store_metadata:
+            query += ",\nlangchain_metadata JSON"
+        query += "\n);"
+
+        with self.engine.connect() as conn:
+            conn.execute(text(query))
+            conn.commit()
+
+        # await self._aexecute_update(query)
