@@ -203,6 +203,7 @@ class MySQLEngine:
         """
         return self.engine.connect()
 
+
     def init_vectorstore_table(
         self,
         table_name: str,
@@ -252,3 +253,56 @@ class MySQLEngine:
             conn.commit()
 
         # await self._aexecute_update(query)
+
+    def init_document_table(
+        self,
+        table_name: str,
+        metadata_columns: List[sqlalchemy.Column] = [],
+        store_metadata: bool = True,
+    ) -> None:
+        """
+        Create a table for saving of langchain documents.
+
+        Args:
+            table_name (str): The MySQL database table name.
+            metadata_columns (List[sqlalchemy.Column]): A list of SQLAlchemy Columns
+                to create for custom metadata. Optional.
+            store_metadata (bool): Whether to store extra metadata in a metadata column
+                if not described in 'metadata' field list (Default: True).
+        """
+        columns = [
+            sqlalchemy.Column(
+                "page_content",
+                sqlalchemy.UnicodeText,
+                primary_key=False,
+                nullable=False,
+            )
+        ]
+        columns += metadata_columns
+        if store_metadata:
+            columns.append(
+                sqlalchemy.Column(
+                    "langchain_metadata",
+                    sqlalchemy.JSON,
+                    primary_key=False,
+                    nullable=True,
+                )
+            )
+        sqlalchemy.Table(table_name, sqlalchemy.MetaData(), *columns).create(
+            self.engine
+        )
+
+    def _load_document_table(self, table_name: str) -> sqlalchemy.Table:
+        """
+        Load table schema from existing table in MySQL database.
+
+        Args:
+            table_name (str): The MySQL database table name.
+
+        Returns:
+            (sqlalchemy.Table): The loaded table.
+        """
+        metadata = sqlalchemy.MetaData()
+        sqlalchemy.MetaData.reflect(metadata, bind=self.engine, only=[table_name])
+        return metadata.tables[table_name]
+
